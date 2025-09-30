@@ -25,10 +25,10 @@ const GreetingCard = ({ name }) => {
            
             <img src="./kite.png" alt="Kite" className="absolute w-20 sm:w-24 top-[-30px] left-[-30px] rotate-[-15deg] opacity-90 animate-float" />
             <img src="./jamara.png" alt="Jamara" className="absolute w-16 sm:w-20 bottom-[-20px] left-6 opacity-90 animate-grow" />
-            <img src="./tika.png" alt="Tika" className="absolute w-12 sm:w-16 top-8 right-8 rounded-full shadow-lg animate-pulse" />
+            <img src="./tika.png" alt="Tika" className="absolute w-12 sm:w-16 top-8 right-8 rounded-full " />
             <img src="./swing.png" alt="Swing" className="absolute w-20 sm:w-24 bottom-[-30px] right-[-20px] opacity-80 animate-swing" />
 
-            
+            {/* Card Content */}
             <div className="relative z-10 flex flex-col items-center">
                 <h1 className="mb-4 text-3xl sm:text-4xl font-extrabold text-red-700 italic drop-shadow-lg tracking-wide animate-slide-down">
                     शुभ दशैं, {name}!
