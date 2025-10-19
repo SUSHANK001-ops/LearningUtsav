@@ -7,13 +7,38 @@ const summeryRoutes = require("./routes/summeryRoutes");
 const app = express();
 const cors = require('cors');
 
-// Allow requests from the Vite dev server (http://localhost:5173)
-app.use(cors({
-  origin: 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+// Dynamic CORS allowlist from env (comma-separated)
+const allowlist = (process.env.CORS_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow non-browser requests (e.g., Postman) with no origin
+    if (!origin) return callback(null, true);
+    if (allowlist.includes(origin)) return callback(null, true);
+    // Allow any Vercel frontend
+    try {
+      const url = new URL(origin);
+      if (url.hostname.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+    } catch (_) {}
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-}));
+};
+
+// Ensure caches vary by Origin and handle preflight
+app.use((req, res, next) => {
+  res.header('Vary', 'Origin');
+  next();
+});
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Parse JSON and urlencoded bodies
 app.use(express.json());

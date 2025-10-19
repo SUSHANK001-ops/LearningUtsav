@@ -2,6 +2,7 @@ const axios = require("axios");
 const Summary = require("../models/Summaries");
 const User = require("../models/Users");
 
+// POST /api/summarize
 const summarizeText = async (req, res) => {
   try {
     // Accept both "text" and "originalText" keys from frontend
@@ -12,10 +13,10 @@ const summarizeText = async (req, res) => {
       return res.status(400).json({ message: "Text is required" });
     }
 
-  
     if (req.user.dailyLimit <= 0) {
       return res.status(403).json({ message: "Daily limit exceeded" });
     }
+
     const payload = {
       contents: [
         {
@@ -32,59 +33,49 @@ const summarizeText = async (req, res) => {
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.API_KEY}`,
       payload,
       {
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       }
     );
 
-    console.log("API Response:", JSON.stringify(response.data, null, 2));
+    // console.log("API Response:", JSON.stringify(response.data, null, 2));
 
     const summarizedText = response.data.candidates[0].content.parts[0].text;
     const newSummary = new Summary({
       userId: req.user._id,
       originalText: textToSummarize,
       summarizedText,
-      tone: req.body.tone || "neutral",
-    
+      tone: tone || "neutral",
     });
 
     await newSummary.save();
 
-    req.user.dailyLimit -= 1;
+    // Decrement user's remaining daily limit
+    req.user.dailyLimit = Math.max(0, (req.user.dailyLimit || 0) - 1);
     await req.user.save();
 
-    res.status(200).json({ 
-      summarizedText,
-      remainingLimit: req.user.dailyLimit 
-    });
+    res.status(200).json({ summarizedText, remainingLimit: req.user.dailyLimit });
   } catch (error) {
     console.error("Error summarizing text:", error.message);
     if (error.response) {
       console.error("API Error Response:", error.response.data);
       console.error("API Status:", error.response.status);
     }
-    res.status(500).json({ 
-      message: "Internal server error",
-      error: error.message 
-    });
+    res.status(500).json({ message: "Internal server error", error: error.message });
   }
 };
 
-// Get summary history for the authenticated user
+// GET /api/summarize/history
 const getSummaryHistory = async (req, res) => {
   try {
     const summaries = await Summary.find({ userId: req.user._id }).sort({ createdAt: -1 });
-    
-    // Get fresh user data to return current dailyLimit
-    const user = await User.findById(req.user._id).select('dailyLimit');
-    
-    console.log(`[getSummaryHistory] User ${req.user._id}: ${summaries.length} summaries, dailyLimit: ${user?.dailyLimit}`);
-    
-    res.status(200).json({ 
+    const user = await User.findById(req.user._id).select("dailyLimit");
+    const totalLimit = Number(process.env.DAILY_LIMIT || 10);
+
+    res.status(200).json({
       summaries,
-      dailyLimit: user?.dailyLimit || 0,
-      totalSummaries: summaries.length
+      dailyLimit: user?.dailyLimit ?? 0, // remaining today
+      totalSummaries: summaries.length,
+      totalLimit,
     });
   } catch (error) {
     console.error("Error fetching summary history:", error.message);
@@ -92,7 +83,7 @@ const getSummaryHistory = async (req, res) => {
   }
 };
 
-// Delete a specific summary by id
+// DELETE /api/summarize/:id
 const deleteSummary = async (req, res) => {
   try {
     const { id } = req.params;
@@ -100,10 +91,10 @@ const deleteSummary = async (req, res) => {
     if (!summary) {
       return res.status(404).json({ message: "Summary not found" });
     }
-    
-    // Give back one quota to the user
+
+    // Optionally increment remaining limit when user deletes a summary
     await User.findByIdAndUpdate(req.user._id, { $inc: { dailyLimit: 1 } });
-    
+
     res.status(200).json({ message: "Summary deleted successfully" });
   } catch (error) {
     console.error("Error deleting summary:", error.message);
