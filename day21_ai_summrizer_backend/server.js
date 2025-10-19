@@ -38,7 +38,13 @@ app.use((req, res, next) => {
   next();
 });
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+// Generic OPTIONS handler compatible with Express 5 (no '*' path)
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 // Parse JSON and urlencoded bodies
 app.use(express.json());
